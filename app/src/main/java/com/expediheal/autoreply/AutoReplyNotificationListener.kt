@@ -24,6 +24,7 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         private val IGNORE_TITLE_PATTERNS = listOf(
             Regex("^\\d+ new messages? from \\d+ chats?", RegexOption.IGNORE_CASE),
             Regex("^WhatsApp$", RegexOption.IGNORE_CASE),
+            Regex("^WhatsApp Business$", RegexOption.IGNORE_CASE),
             Regex("^Checking for new messages", RegexOption.IGNORE_CASE),
             Regex("^Backing up", RegexOption.IGNORE_CASE),
             Regex("^Backup", RegexOption.IGNORE_CASE)
@@ -44,43 +45,59 @@ class AutoReplyNotificationListener : NotificationListenerService() {
             handleNotification(sbn)
         } catch (e: Exception) {
             Log.e(TAG, "error handling notification", e)
+            DebugLog.add(applicationContext, "ERROR: ${e.message}")
         }
+    }
+
+    private fun normalizeTitle(rawTitle: String): String {
+        var t = rawTitle.trim()
+        t = t.replace(Regex("\\s*\\(\\d+\\)\\s*$"), "")
+        t = t.replace(Regex("\\s*•\\s*\\d+\\s+new\\s*$", RegexOption.IGNORE_CASE), "")
+        t = t.replace(Regex("\\s*:\\s*\\d+\\s*$"), "")
+        return t.trim()
     }
 
     private fun handleNotification(sbn: StatusBarNotification) {
         val notif = sbn.notification ?: return
         val extras: Bundle = notif.extras ?: return
 
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        val rawTitle = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
 
-        if (title.isBlank() || text.isBlank()) return
+        if (rawTitle.isBlank() || text.isBlank()) {
+            DebugLog.add(applicationContext, "skip: empty title or text")
+            return
+        }
 
-        if (IGNORE_TITLE_PATTERNS.any { it.containsMatchIn(title) }) {
-            Log.d(TAG, "skipping summary notification: $title")
+        if (IGNORE_TITLE_PATTERNS.any { it.containsMatchIn(rawTitle) }) {
+            DebugLog.add(applicationContext, "skip summary: '$rawTitle'")
             return
         }
 
         if (text.startsWith("You: ", ignoreCase = true)) {
-            Log.d(TAG, "skipping own message echo")
+            DebugLog.add(applicationContext, "skip own echo: '$rawTitle'")
             return
         }
 
         val replyAction = findReplyAction(notif)
         if (replyAction == null) {
-            Log.d(TAG, "no reply action available on notification from $title")
+            DebugLog.add(applicationContext, "no reply action: '$rawTitle' (group chat?)")
             return
         }
 
-        val userKey = "${sbn.packageName}::$title"
+        val normalizedTitle = normalizeTitle(rawTitle)
+        val userKey = "${sbn.packageName}::$normalizedTitle"
+
+        DebugLog.add(applicationContext,
+            "got msg from '$normalizedTitle' (raw: '$rawTitle'): \"${text.take(40)}\"")
 
         synchronized(pendingUsers) {
             if (userKey in pendingUsers) {
-                Log.d(TAG, "reply already pending for $userKey, ignoring (msg: $text)")
+                DebugLog.add(applicationContext, "  → BLOCKED: reply already pending for '$normalizedTitle'")
                 return
             }
             if (Settings.isInCooldown(applicationContext, userKey)) {
-                Log.d(TAG, "user $userKey in cooldown, skipping")
+                DebugLog.add(applicationContext, "  → BLOCKED: cooldown active for '$normalizedTitle'")
                 return
             }
             pendingUsers.add(userKey)
@@ -88,7 +105,7 @@ class AutoReplyNotificationListener : NotificationListenerService() {
 
         val templates = Settings.getTemplates(applicationContext)
         if (templates.isEmpty()) {
-            Log.d(TAG, "no templates configured")
+            DebugLog.add(applicationContext, "  → no templates configured")
             pendingUsers.remove(userKey)
             return
         }
@@ -98,20 +115,22 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         val maxSec = Settings.getDelayMaxSeconds(applicationContext).coerceAtLeast(minSec)
         val delayMs = Random.nextLong(minSec * 1000L, (maxSec + 1) * 1000L)
 
-        Log.d(TAG, "scheduling reply to $title in ${delayMs}ms: $replyText")
+        DebugLog.add(applicationContext,
+            "  → SCHEDULED: reply in ${delayMs/1000}s with: \"${replyText.take(40)}\"")
 
         Settings.markReplied(applicationContext, userKey)
 
         handler.postDelayed({
             try {
                 if (!Settings.isEnabled(applicationContext)) {
-                    Log.d(TAG, "auto-reply disabled before send fired, aborting")
+                    DebugLog.add(applicationContext, "  → ABORTED: disabled before fire")
                     return@postDelayed
                 }
                 sendReply(replyAction, replyText)
-                Log.d(TAG, "sent reply to $title")
+                DebugLog.add(applicationContext, "  ✓ SENT to '$normalizedTitle'")
             } catch (e: Exception) {
                 Log.e(TAG, "failed to send reply", e)
+                DebugLog.add(applicationContext, "  ✗ FAILED: ${e.message}")
             } finally {
                 pendingUsers.remove(userKey)
             }
@@ -155,11 +174,11 @@ class AutoReplyNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        Log.d(TAG, "notification listener connected")
+        DebugLog.add(applicationContext, "service connected")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        Log.d(TAG, "notification listener disconnected")
+        DebugLog.add(applicationContext, "service disconnected")
     }
 }
