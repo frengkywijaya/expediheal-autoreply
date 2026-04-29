@@ -9,7 +9,6 @@ import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import androidx.core.app.RemoteInput
 import kotlin.random.Random
 
 class AutoReplyNotificationListener : NotificationListenerService() {
@@ -22,8 +21,6 @@ class AutoReplyNotificationListener : NotificationListenerService() {
             "com.whatsapp.w4b"      // WhatsApp Business
         )
 
-        // Notification keys WA uses to identify summary / group / silent notifications
-        // we should not auto-reply to. Title patterns that indicate batched/summary.
         private val IGNORE_TITLE_PATTERNS = listOf(
             Regex("^\\d+ new messages? from \\d+ chats?", RegexOption.IGNORE_CASE),
             Regex("^WhatsApp$", RegexOption.IGNORE_CASE),
@@ -56,36 +53,29 @@ class AutoReplyNotificationListener : NotificationListenerService() {
 
         if (title.isBlank() || text.isBlank()) return
 
-        // Skip summary/system notifications
         if (IGNORE_TITLE_PATTERNS.any { it.containsMatchIn(title) }) {
             Log.d(TAG, "skipping summary notification: $title")
             return
         }
 
-        // Skip group chats (title contains ":" indicating "GroupName: SenderName")
-        // Also skip if title indicates a "you" / "you replied" message
         if (text.startsWith("You: ", ignoreCase = true)) {
             Log.d(TAG, "skipping own message echo")
             return
         }
 
-        // Find the RemoteInput action — this is what lets us reply
         val replyAction = findReplyAction(notif)
         if (replyAction == null) {
             Log.d(TAG, "no reply action available on notification from $title")
             return
         }
 
-        // Compute user key (so we can rate-limit per user)
         val userKey = "${sbn.packageName}::$title"
 
-        // Check cooldown — don't spam-reply the same person
         if (Settings.isInCooldown(applicationContext, userKey)) {
             Log.d(TAG, "user $userKey in cooldown, skipping")
             return
         }
 
-        // Pick a random template
         val templates = Settings.getTemplates(applicationContext)
         if (templates.isEmpty()) {
             Log.d(TAG, "no templates configured")
@@ -93,14 +83,12 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         }
         val replyText = templates[Random.nextInt(templates.size)]
 
-        // Pick a random delay
         val minSec = Settings.getDelayMinSeconds(applicationContext)
         val maxSec = Settings.getDelayMaxSeconds(applicationContext).coerceAtLeast(minSec)
         val delayMs = Random.nextLong(minSec * 1000L, (maxSec + 1) * 1000L)
 
         Log.d(TAG, "scheduling reply to $title in ${delayMs}ms: $replyText")
 
-        // Mark replied immediately so we don't queue duplicates if more notifications fire
         Settings.markReplied(applicationContext, userKey)
 
         Handler(Looper.getMainLooper()).postDelayed({
@@ -117,14 +105,10 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         }, delayMs)
     }
 
-    /**
-     * Find the first inline-reply action on the notification (the one with a RemoteInput).
-     */
     private fun findReplyAction(notif: Notification): ReplyTarget? {
         val actions = notif.actions ?: return null
         for (action in actions) {
             val remoteInputs = action.remoteInputs ?: continue
-            // We want the "Reply" / inline-text input
             for (ri in remoteInputs) {
                 if (ri.allowFreeFormInput) {
                     return ReplyTarget(action.actionIntent, ri, action.remoteInputs.toList())
@@ -140,7 +124,11 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         val bundle = Bundle().apply {
             putCharSequence(target.remoteInput.resultKey, text)
         }
-        RemoteInput.addResultsToIntent(target.allRemoteInputs.toTypedArray(), replyIntent, bundle)
+        android.app.RemoteInput.addResultsToIntent(
+            target.allRemoteInputs.toTypedArray(),
+            replyIntent,
+            bundle
+        )
         pi.send(applicationContext, 0, replyIntent)
     }
 
