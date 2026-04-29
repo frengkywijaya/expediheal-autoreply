@@ -33,10 +33,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUi() {
-        // Master toggle
         binding.switchEnabled.setOnCheckedChangeListener { _, checked ->
             if (checked && !isNotificationListenerEnabled()) {
-                // Need permission first
                 binding.switchEnabled.isChecked = false
                 showPermissionPrompt()
                 return@setOnCheckedChangeListener
@@ -45,10 +43,8 @@ class MainActivity : AppCompatActivity() {
             updateStatusText(checked)
         }
 
-        // Permission button
         binding.btnGrantAccess.setOnClickListener { openNotificationAccessSettings() }
 
-        // Templates list
         adapter = TemplateAdapter(
             onEdit = { idx, current -> showTemplateDialog(idx, current) },
             onDelete = { idx -> deleteTemplate(idx) }
@@ -57,12 +53,9 @@ class MainActivity : AppCompatActivity() {
         binding.recyclerTemplates.adapter = adapter
 
         binding.btnAddTemplate.setOnClickListener { showTemplateDialog(null, "") }
-
-        // Delay range
         binding.btnEditDelay.setOnClickListener { showDelayDialog() }
-
-        // Cooldown
         binding.btnEditCooldown.setOnClickListener { showCooldownDialog() }
+        binding.btnShowLogs.setOnClickListener { showLogsDialog() }
     }
 
     private fun refreshFromSettings() {
@@ -99,7 +92,6 @@ class MainActivity : AppCompatActivity() {
             if (granted) android.view.View.GONE else android.view.View.VISIBLE
     }
 
-    // ---------- Templates ----------
     private fun showTemplateDialog(index: Int?, current: String) {
         val edit = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -149,7 +141,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // ---------- Delay ----------
     private fun showDelayDialog() {
         val minEdit = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
@@ -181,7 +172,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // ---------- Cooldown ----------
     private fun showCooldownDialog() {
         val edit = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
@@ -206,7 +196,41 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // ---------- Permission ----------
+    private fun showLogsDialog() {
+        val logs = DebugLog.get(this)
+        val text = if (logs.isEmpty()) {
+            "No events yet.\n\nSend yourself a WhatsApp message to test."
+        } else {
+            logs.joinToString("\n")
+        }
+
+        val txtView = android.widget.TextView(this).apply {
+            setText(text)
+            textSize = 11f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextIsSelectable(true)
+            setPadding(
+                (16 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt()
+            )
+        }
+        val scroll = android.widget.ScrollView(this).apply {
+            addView(txtView)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Debug log (newest first)")
+            .setView(scroll)
+            .setPositiveButton("Close", null)
+            .setNeutralButton("Clear") { _, _ ->
+                DebugLog.clear(this)
+                Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
     private fun isNotificationListenerEnabled(): Boolean {
         val flat = AndroidSettings.Secure.getString(
             contentResolver,
