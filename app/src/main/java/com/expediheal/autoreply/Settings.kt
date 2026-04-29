@@ -13,6 +13,7 @@ object Settings {
     private const val KEY_DELAY_MAX_SECONDS = "delay_max_seconds"
     private const val KEY_COOLDOWN_MINUTES = "cooldown_minutes"
     private const val KEY_REPLIED_USERS = "replied_users_v2"
+    private const val KEY_LAST_MESSAGE = "last_message_per_user"
 
     private val gson = Gson()
 
@@ -79,7 +80,6 @@ object Settings {
     fun markReplied(ctx: Context, userKey: String) {
         val map = getRepliedUsers(ctx)
         map[userKey] = System.currentTimeMillis()
-        // Prune entries older than 24 hours to keep prefs small.
         val cutoff = System.currentTimeMillis() - (24L * 60 * 60 * 1000)
         val pruned = map.filterValues { it > cutoff }.toMutableMap()
         setRepliedUsers(ctx, pruned)
@@ -89,5 +89,31 @@ object Settings {
         val lastReply = getRepliedUsers(ctx)[userKey] ?: return false
         val cooldownMs = getCooldownMinutes(ctx) * 60L * 1000L
         return (System.currentTimeMillis() - lastReply) < cooldownMs
+    }
+
+    fun getLastRepliedMessage(ctx: Context): MutableMap<String, String> {
+        val json = prefs(ctx).getString(KEY_LAST_MESSAGE, null) ?: return mutableMapOf()
+        return try {
+            val type = object : TypeToken<MutableMap<String, String>>() {}.type
+            gson.fromJson(json, type) ?: mutableMapOf()
+        } catch (e: Exception) {
+            mutableMapOf()
+        }
+    }
+
+    fun markMessageReplied(ctx: Context, userKey: String, messageText: String) {
+        val map = getLastRepliedMessage(ctx)
+        map[userKey] = messageText
+        if (map.size > 200) {
+            val trimmed = map.entries.toList().takeLast(150).associate { it.key to it.value }.toMutableMap()
+            prefs(ctx).edit().putString(KEY_LAST_MESSAGE, gson.toJson(trimmed)).apply()
+        } else {
+            prefs(ctx).edit().putString(KEY_LAST_MESSAGE, gson.toJson(map)).apply()
+        }
+    }
+
+    fun hasAlreadyRepliedToMessage(ctx: Context, userKey: String, messageText: String): Boolean {
+        val last = getLastRepliedMessage(ctx)[userKey] ?: return false
+        return last == messageText
     }
 }
