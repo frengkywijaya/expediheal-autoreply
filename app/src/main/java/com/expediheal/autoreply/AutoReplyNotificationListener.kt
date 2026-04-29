@@ -17,8 +17,8 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         private const val TAG = "WaAutoReply"
 
         private val WA_PACKAGES = setOf(
-            "com.whatsapp",         // WhatsApp
-            "com.whatsapp.w4b"      // WhatsApp Business
+            "com.whatsapp",
+            "com.whatsapp.w4b"
         )
 
         private val IGNORE_TITLE_PATTERNS = listOf(
@@ -71,6 +71,12 @@ class AutoReplyNotificationListener : NotificationListenerService() {
 
         val userKey = "${sbn.packageName}::$title"
 
+        // DEDUP: have we already replied to this exact message text?
+        if (Settings.hasAlreadyRepliedToMessage(applicationContext, userKey, text)) {
+            Log.d(TAG, "already replied to this exact message from $userKey, skipping")
+            return
+        }
+
         if (Settings.isInCooldown(applicationContext, userKey)) {
             Log.d(TAG, "user $userKey in cooldown, skipping")
             return
@@ -90,6 +96,7 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         Log.d(TAG, "scheduling reply to $title in ${delayMs}ms: $replyText")
 
         Settings.markReplied(applicationContext, userKey)
+        Settings.markMessageReplied(applicationContext, userKey, text)
 
         Handler(Looper.getMainLooper()).postDelayed({
             try {
@@ -138,9 +145,7 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         val allRemoteInputs: List<android.app.RemoteInput>
     )
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        // no-op
-    }
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {}
 
     override fun onListenerConnected() {
         super.onListenerConnected()
