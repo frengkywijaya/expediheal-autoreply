@@ -143,6 +143,16 @@ class AutoReplyNotificationListener : NotificationListenerService() {
                 }
                 sendReply(replyAction, replyText)
                 DebugLog.add(applicationContext, "  ✓ SENT to '$normalizedTitle'")
+
+                // Dismiss the notification we just replied to.
+                // This stops WA from re-posting it AND prevents our own reply
+                // from showing as a new notification (avoiding the echo loop).
+                try {
+                    cancelNotification(sbn.key)
+                    DebugLog.add(applicationContext, "  ✓ dismissed notification")
+                } catch (e: Exception) {
+                    DebugLog.add(applicationContext, "  ! failed to dismiss: ${e.message}")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "failed to send reply", e)
                 DebugLog.add(applicationContext, "  ✗ FAILED: ${e.message}")
