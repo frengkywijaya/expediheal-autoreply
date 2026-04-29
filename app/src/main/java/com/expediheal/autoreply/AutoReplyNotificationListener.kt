@@ -27,7 +27,15 @@ class AutoReplyNotificationListener : NotificationListenerService() {
             Regex("^WhatsApp Business$", RegexOption.IGNORE_CASE),
             Regex("^Checking for new messages", RegexOption.IGNORE_CASE),
             Regex("^Backing up", RegexOption.IGNORE_CASE),
-            Regex("^Backup", RegexOption.IGNORE_CASE)
+            Regex("^Backup", RegexOption.IGNORE_CASE),
+            Regex("^You$", RegexOption.IGNORE_CASE),
+            Regex("^Anda$", RegexOption.IGNORE_CASE),
+            Regex("^Tu$", RegexOption.IGNORE_CASE),
+            Regex("^Du$", RegexOption.IGNORE_CASE),
+            Regex("^Bạn$", RegexOption.IGNORE_CASE),
+            Regex("^คุณ$", RegexOption.IGNORE_CASE),
+            Regex("^你$", RegexOption.IGNORE_CASE),
+            Regex("^あなた$", RegexOption.IGNORE_CASE)
         )
 
         private val pendingUsers = java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -70,12 +78,13 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         }
 
         if (IGNORE_TITLE_PATTERNS.any { it.containsMatchIn(rawTitle) }) {
-            DebugLog.add(applicationContext, "skip summary: '$rawTitle'")
+            DebugLog.add(applicationContext, "skip system/echo title: '$rawTitle'")
             return
         }
 
-        if (text.startsWith("You: ", ignoreCase = true)) {
-            DebugLog.add(applicationContext, "skip own echo: '$rawTitle'")
+        if (text.startsWith("You: ", ignoreCase = true) ||
+            text.startsWith("Anda: ", ignoreCase = true)) {
+            DebugLog.add(applicationContext, "skip own-message echo: '$rawTitle'")
             return
         }
 
@@ -89,15 +98,20 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         val userKey = "${sbn.packageName}::$normalizedTitle"
 
         DebugLog.add(applicationContext,
-            "got msg from '$normalizedTitle' (raw: '$rawTitle'): \"${text.take(40)}\"")
+            "got msg from '$normalizedTitle': \"${text.take(50)}\"")
+
+        if (Settings.hasAlreadyRepliedToMessage(applicationContext, userKey, text)) {
+            DebugLog.add(applicationContext, "  → SKIP: already replied to this exact message")
+            return
+        }
 
         synchronized(pendingUsers) {
             if (userKey in pendingUsers) {
-                DebugLog.add(applicationContext, "  → BLOCKED: reply already pending for '$normalizedTitle'")
+                DebugLog.add(applicationContext, "  → BLOCKED: reply already pending")
                 return
             }
             if (Settings.isInCooldown(applicationContext, userKey)) {
-                DebugLog.add(applicationContext, "  → BLOCKED: cooldown active for '$normalizedTitle'")
+                DebugLog.add(applicationContext, "  → BLOCKED: cooldown active")
                 return
             }
             pendingUsers.add(userKey)
@@ -119,6 +133,7 @@ class AutoReplyNotificationListener : NotificationListenerService() {
             "  → SCHEDULED: reply in ${delayMs/1000}s with: \"${replyText.take(40)}\"")
 
         Settings.markReplied(applicationContext, userKey)
+        Settings.markMessageReplied(applicationContext, userKey, text)
 
         handler.postDelayed({
             try {
