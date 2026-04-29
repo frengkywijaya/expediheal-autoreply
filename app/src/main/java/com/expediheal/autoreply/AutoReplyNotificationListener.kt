@@ -28,6 +28,9 @@ class AutoReplyNotificationListener : NotificationListenerService() {
             Regex("^Backing up", RegexOption.IGNORE_CASE),
             Regex("^Backup", RegexOption.IGNORE_CASE)
         )
+
+        private val pendingUsers = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        private val handler = Handler(Looper.getMainLooper())
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -71,20 +74,22 @@ class AutoReplyNotificationListener : NotificationListenerService() {
 
         val userKey = "${sbn.packageName}::$title"
 
-        // DEDUP: have we already replied to this exact message text?
-        if (Settings.hasAlreadyRepliedToMessage(applicationContext, userKey, text)) {
-            Log.d(TAG, "already replied to this exact message from $userKey, skipping")
-            return
-        }
-
-        if (Settings.isInCooldown(applicationContext, userKey)) {
-            Log.d(TAG, "user $userKey in cooldown, skipping")
-            return
+        synchronized(pendingUsers) {
+            if (userKey in pendingUsers) {
+                Log.d(TAG, "reply already pending for $userKey, ignoring (msg: $text)")
+                return
+            }
+            if (Settings.isInCooldown(applicationContext, userKey)) {
+                Log.d(TAG, "user $userKey in cooldown, skipping")
+                return
+            }
+            pendingUsers.add(userKey)
         }
 
         val templates = Settings.getTemplates(applicationContext)
         if (templates.isEmpty()) {
             Log.d(TAG, "no templates configured")
+            pendingUsers.remove(userKey)
             return
         }
         val replyText = templates[Random.nextInt(templates.size)]
@@ -96,9 +101,8 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         Log.d(TAG, "scheduling reply to $title in ${delayMs}ms: $replyText")
 
         Settings.markReplied(applicationContext, userKey)
-        Settings.markMessageReplied(applicationContext, userKey, text)
 
-        Handler(Looper.getMainLooper()).postDelayed({
+        handler.postDelayed({
             try {
                 if (!Settings.isEnabled(applicationContext)) {
                     Log.d(TAG, "auto-reply disabled before send fired, aborting")
@@ -108,6 +112,8 @@ class AutoReplyNotificationListener : NotificationListenerService() {
                 Log.d(TAG, "sent reply to $title")
             } catch (e: Exception) {
                 Log.e(TAG, "failed to send reply", e)
+            } finally {
+                pendingUsers.remove(userKey)
             }
         }, delayMs)
     }
