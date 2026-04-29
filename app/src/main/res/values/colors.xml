@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#3a3a8e</color>
+    <color name="primary_dark">#2a2a6e</color>
+    <color name="accent">#5cd5c0</color>
+    <color name="pink">#ff5a7e</color>
+    <color name="header">#3a3a8e</color>
+    <color name="bg">#f7f9fa</color>
+    <color name="card">#ffffff</color>
+    <color name="text">#111b21</color>
+    <color name="text_muted">#667781</color>
+</resources>

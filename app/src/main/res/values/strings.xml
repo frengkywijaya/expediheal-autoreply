@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Expediheal AutoReply</string>
+
+    <string name="auto_reply">Auto-reply</string>
+    <string name="status_running">Running — replying to incoming WA messages</string>
+    <string name="status_stopped">Stopped</string>
+
+    <string name="notification_access">Notification access</string>
+    <string name="permission_granted">✓ Granted</string>
+    <string name="permission_missing">⚠ Required to read incoming messages</string>
+    <string name="grant_access">Grant access</string>
+    <string name="permission_dialog_title">Notification access required</string>
+    <string name="permission_dialog_message">To auto-reply to WhatsApp messages, this app needs permission to read your notifications. Tap "Open settings", then enable Expediheal AutoReply in the list.</string>
+    <string name="permission_open_settings">Open settings</string>
+    <string name="cant_open_settings">Could not open notification settings</string>
+
+    <string name="reply_templates">Reply templates</string>
+    <string name="templates_hint">A random one will be picked for each reply. Tap to edit.</string>
+    <string name="add">Add</string>
+    <string name="add_template">Add template</string>
+    <string name="edit_template">Edit template</string>
+    <string name="delete_template">Delete template?</string>
+    <string name="delete_template_confirm">Are you sure you want to delete this template?</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="template_empty_warning">Template can\'t be empty</string>
+
+    <string name="reply_delay">Reply delay (random)</string>
+    <string name="delay_format">%1$d–%2$d seconds</string>
+    <string name="delay_dialog_title">Random delay range</string>
+
+    <string name="per_user_cooldown">Per-user cooldown</string>
+    <plurals name="cooldown_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <string name="cooldown_dialog_title">Per-user cooldown</string>
+    <string name="cooldown_dialog_message">After replying to someone, wait this many minutes before replying to them again. Set to 0 to always reply.</string>
+
+    <string name="footer_note">Auto-reply works for direct WhatsApp / WA Business notifications. Group chats and locked-screen messages won\'t trigger replies. By Expediheal.</string>
+</resources>
