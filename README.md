@@ -59,6 +59,30 @@ You don't need Android Studio. The project includes a GitHub Actions workflow th
 3. Allow "Install from this source" if prompted
 4. Tap Install
 
+### Install on each profile
+
+Because Android's NotificationListener is isolated per user profile, the APK must be installed INSIDE each profile that has WhatsApp.
+
+For Island / Shelter work profiles:
+1. Install the APK normally (main profile)
+2. Open Island (or Shelter)
+3. Find "Expediheal AutoReply" in the app list
+4. Tap "Clone to work profile" (Island) or "Add to work profile" (Shelter)
+5. Launch the cloned app (will show briefcase 💼 icon)
+6. Grant notification access for that profile via ADB from your computer:
+
+   ```
+   # Find the work profile user ID:
+   adb -s <serial> shell pm list users
+
+   # Grant notification access to that user (replace 10 with actual Island user ID):
+   adb -s <serial> shell settings put --user 10 secure enabled_notification_listeners com.expediheal.autoreply/com.expediheal.autoreply.AutoReplyNotificationListener
+   ```
+
+7. Open the cloned Expediheal AutoReply (briefcase icon) → toggle ON
+
+Repeat per phone that has an Island/Shelter work profile.
+
 ## Setup after install
 
 1. Open **Expediheal AutoReply**

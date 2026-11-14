@@ -46,6 +46,10 @@ class AutoReplyNotificationListener : NotificationListenerService() {
         if (sbn == null) return
         val pkg = sbn.packageName ?: return
 
+        val logTitle = sbn.notification?.extras
+            ?.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        DebugLog.add(applicationContext, "pkg=$pkg title=$logTitle")
+
         if (pkg !in WA_PACKAGES) return
         if (!Settings.isEnabled(applicationContext)) return
 
